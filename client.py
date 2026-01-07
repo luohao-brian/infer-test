@@ -19,10 +19,9 @@ class AsyncLLMClient:
         re.DOTALL | re.IGNORECASE
     )
 
-    def __init__(self, base_url, api_key, model, suppress_thinking=False):
+    def __init__(self, base_url, api_key, model):
         self.client = AsyncOpenAI(base_url=base_url, api_key=api_key)
         self.model = model
-        self.suppress_thinking = suppress_thinking
 
     def _parse_thinking(self, text):
         """Extracts thinking content and final response from text."""
@@ -52,14 +51,13 @@ class AsyncLLMClient:
             thinking, final = self._parse_thinking(content)
             
             if thinking:
-                if not self.suppress_thinking:
-                    self._print_block("THINKING PROCESS", thinking)
+                self._print_block("THINKING PROCESS", thinking)
                 self._print_block("FINAL RESPONSE", final)
             else:
                 self._print_block("RESPONSE", content)
                 
-            if hasattr(response, 'usage'):
-                print(f"Usage: {response.usage}")
+            # if hasattr(response, 'usage'):
+            #     print(f"Usage: {response.usage}")
 
         except Exception as e:
             print(f"Error: {e}")
@@ -102,8 +100,7 @@ class AsyncLLMClient:
                         pre, post = display_buffer.split(tag_found, 1)
                         if pre.strip():
                             print(pre, end="", flush=True)
-                        if not self.suppress_thinking:
-                            print(f"\n{'='*20} THINKING PROCESS {'='*20}\n")
+                        print(f"\n{'='*20} THINKING PROCESS {'='*20}\n")
                         state = "THINKING"
                         display_buffer = post 
                     elif "<" in display_buffer:
@@ -128,16 +125,14 @@ class AsyncLLMClient:
                         
                     if close_tag_found:
                         think_content, post = display_buffer.split(close_tag_found, 1)
-                        if not self.suppress_thinking:
-                            print(think_content, end="", flush=True)
-                            print(f"\n\n{'='*20} FINAL RESPONSE {'='*20}\n")
+                        print(think_content, end="", flush=True)
+                        print(f"\n\n{'='*20} FINAL RESPONSE {'='*20}\n")
                         state = "DONE_THINKING"
                         display_buffer = post 
                     elif "</" in display_buffer or "<|" in display_buffer:
                         continue
                     else:
-                        if not self.suppress_thinking:
-                            print(display_buffer, end="", flush=True)
+                        print(display_buffer, end="", flush=True)
                         display_buffer = ""
                         
                 elif state == "DONE_THINKING":
@@ -163,9 +158,8 @@ async def main():
     parser.add_argument("--template", type=str, default="templates/chat.yaml", help="Path to chat template YAML")
     parser.add_argument("--prompt", type=str, help="Direct user prompt from CLI")
     parser.add_argument("--stream", action="store_true", help="Enable streaming")
-    parser.add_argument("--no-thinking", action="store_true", help="Suppress/Hide thinking content from output")
-    parser.add_argument("--think", action="store_true", help="Force enable thinking logic (sets enable_thinking=True)")
-    parser.add_argument("--no-think", action="store_true", help="Force disable thinking logic (API=False + /no_think instruction)")
+    parser.add_argument("--think", action="store_true", help="Force enable thinking logic (sets enable_thinking=True and adds /think)")
+    parser.add_argument("--no-think", action="store_true", help="Force disable thinking logic (sets enable_thinking=False and adds /no_think)")
     parser.add_argument("--max-tokens", type=int, default=4096, help="Maximum tokens to generate (default: 4096)")
     parser.add_argument("--temperature", type=float, help="Sampling temperature")
     
@@ -186,6 +180,8 @@ async def main():
         prompt_text = args.prompt
         if args.no_think:
             prompt_text = f"/no_think {prompt_text}"
+        elif args.think:
+            prompt_text = f"/think {prompt_text}"
         messages.append({"role": "user", "content": prompt_text})
     elif "messages" in config:
         msgs = config["messages"]
@@ -193,6 +189,11 @@ async def main():
             for i in range(len(msgs) - 1, -1, -1):
                 if msgs[i]["role"] == "user":
                     msgs[i]["content"] = f"/no_think {msgs[i]['content']}"
+                    break
+        elif args.think:
+            for i in range(len(msgs) - 1, -1, -1):
+                if msgs[i]["role"] == "user":
+                    msgs[i]["content"] = f"/think {msgs[i]['content']}"
                     break
         messages.extend(msgs)
     else:
@@ -205,7 +206,7 @@ async def main():
     if args.temperature:
         params["temperature"] = args.temperature
 
-    client = AsyncLLMClient(args.base_url, args.api_key, args.model, suppress_thinking=args.no_thinking)
+    client = AsyncLLMClient(args.base_url, args.api_key, args.model)
     
     if args.stream:
         await client.generate_stream(messages, params, extra_body=extra_body)

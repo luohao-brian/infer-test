@@ -18,6 +18,16 @@ uv sync
 CUDA_VISIBLE_DEVICES=1 uv run server.py --model /mnt/data/oniond/models/Qwen3-4B --served-model-name qwen-4b --port 8000 --tensor-parallel-size 1 --max-model-len 8192 --seed 42
 ```
 
+**示例：启动 Qwen 2.5 1.5B Instruct 模型 (轻量测试)**
+```bash
+CUDA_VISIBLE_DEVICES=0 uv run server.py \
+  --model /mnt/data/oniond/models/Qwen2.5-1.5B-Instruct/ \
+  --served-model-name qwen-1.5b \
+  --tensor-parallel-size 1 \
+  --max-model-len 32768 \
+  --port 8000
+```
+
 **示例：A100 x8 终极性能配置 (MoE + Marlin + FP8 KV + Async)**
 ```bash
 # 重定向缓存目录（避免占用系统盘）
