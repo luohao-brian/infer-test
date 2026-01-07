@@ -52,6 +52,41 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 uv run server.py \
   --enable-chunked-prefill
 ```
 
+**示例：Qwen3-Next-80B-A3B-Thinking (MoE 架构优化配置)**
+
+该模型虽有 80B 参数，但每次激活仅 ~3B。推荐使用 **4卡 (TP=4)** 以获得最佳吞吐量，利用另外 4 卡部署第二个实例或留作他用。
+
+* **方案 A：4卡高吞吐 (推荐)**
+  * 利用 FP8 KV Cache 和 Prefix Caching 提升并发能力。
+  * `served-model-name` 设为 `qwen-80b-thinking` 便于调用。
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2,3 uv run server.py \
+  --model /mnt/data/oniond/models/Qwen3-Next-80B-A3B-Thinking \
+  --served-model-name qwen-80b-thinking \
+  --tensor-parallel-size 4 \
+  --trust-remote-code \
+  --gpu-memory-utilization 0.90 \
+  --max-model-len 32768 \
+  --max-num-seqs 128 \
+  --kv-cache-dtype fp8 \
+  --enable-prefix-caching \
+  --port 8000
+```
+
+* **方案 B：8卡超长上下文 (TP=8)**
+  * 仅在需要 32k~128k 极长上下文时使用，利用 8 卡显存堆积 KV Cache。
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 uv run server.py \
+  --model /mnt/data/oniond/models/Qwen3-Next-80B-A3B-Thinking \
+  --served-model-name qwen-80b-thinking \
+  --tensor-parallel-size 8 \
+  --trust-remote-code \
+  --gpu-memory-utilization 0.90 \
+  --max-model-len 65536 \
+  --kv-cache-dtype fp8 \
+  --port 8000
+```
+
 ### 关键参数详解与性能优化指南
 
 | 参数 | 推荐值 | 作用与 A100 x8 优化建议 |
